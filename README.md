@@ -307,6 +307,44 @@ docker exec attendflow-prometheus wget -qO- --post-data='query=sum by (http_rout
 
 Expected: Prometheus returns routes such as `/api/v1/auth/me`; no `/health/live` or `/health/ready` appears. Tempo has root spans named like `GET /api/v1/auth/me` with child `SELECT` spans.
 
+### Alerting
+
+Rules are in [alerts.yml](observability/config/prometheus/rules/alerts.yml). Prometheus evaluates them and sends firing alerts to Alertmanager ([alertmanager.yml](observability/config/alertmanager/alertmanager.yml)), which routes them by severity:
+
+| Severity | Route | Rules |
+|----------|-------|-------|
+| `critical` | `alert-sink /critical`, repeats hourly | `ScrapeTargetDown`, `BackendHighErrorRate`, `PostgresDown` |
+| `warning` | `alert-sink /warning`, repeats every 4h | `BackendHighLatency`, `HostMemoryHigh`, `HostDiskLow`, `ContainerMemoryNearLimit`, `PostgresConnectionsHigh`, `BackendNoTraffic` |
+| `none` | dropped | `Watchdog` (heartbeat that proves the pipeline works) |
+
+The receiver is `alert-sink` ([alert_sink.py](observability/config/alert-sink/alert_sink.py)), a private container with no published port. It logs each alert as a JSON line and keeps the last 50 alerts.
+
+View alerts:
+
+```bash
+# Prometheus rule state (firing / pending / inactive)
+docker exec attendflow-prometheus wget -qO- http://localhost:9090/api/v1/alerts
+# Alertmanager active alerts
+docker exec attendflow-alertmanager wget -qO- http://localhost:9093/api/v2/alerts
+# Delivered notifications (firing and resolved)
+docker logs attendflow-alert-sink
+```
+
+To send alerts to Slack or email instead, add a receiver with credentials in a gitignored file (for example `api_url_file` for Slack), point the `critical` and `warning` routes at it, then restart Alertmanager. Do not put webhook URLs or passwords in `alertmanager.yml`.
+
+Failure simulation (observability-only, the app is unaffected):
+
+```bash
+docker compose -f observability/docker-compose.yml stop postgres-exporter
+# wait about 2 minutes, then check: ScrapeTargetDown is firing in Prometheus and reaches the sink on /critical
+docker compose -f observability/docker-compose.yml start postgres-exporter
+# wait about 5 minutes: the sink logs a "resolved" entry for ScrapeTargetDown
+```
+
+Expected: `ScrapeTargetDown` goes `pending` then `firing` after 2 minutes. The sink logs `critical ScrapeTargetDown firing`, then `resolved` once the exporter is back.
+
+Rules use `for:` so one-off spikes do not page. Alertmanager reads its config only at startup. After changing it, run `docker compose -f observability/docker-compose.yml up -d --force-recreate alertmanager`.
+
 ### Common Issues
 
 **Frontend showing blank page:**
