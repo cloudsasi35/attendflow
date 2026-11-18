@@ -6,6 +6,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.165.0
     container_name: attendflow-otel-collector
+    restart: unless-stopped
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./config/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
@@ -25,6 +26,7 @@ services:
   prometheus:
     image: prom/prometheus:v3.16.0
     container_name: attendflow-prometheus
+    restart: unless-stopped
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -51,6 +53,7 @@ services:
   loki:
     image: grafana/loki:3.7.10
     container_name: attendflow-loki
+    restart: unless-stopped
     command: ["-config.file=/etc/loki/loki.yaml"]
     volumes:
       - ./config/loki/loki.yaml:/etc/loki/loki.yaml:ro
@@ -66,6 +69,7 @@ services:
   tempo:
     image: grafana/tempo:3.1.1
     container_name: attendflow-tempo
+    restart: unless-stopped
     command: ["-config.file=/etc/tempo/tempo.yaml"]
     volumes:
       - ./config/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
@@ -81,6 +85,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.35.0
     container_name: attendflow-alertmanager
+    restart: unless-stopped
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -110,6 +115,7 @@ services:
   alert-sink:
     image: python:3.12-alpine3.22
     container_name: attendflow-alert-sink
+    restart: unless-stopped
     command: ["python", "-u", "/app/alert_sink.py"]
     volumes:
       - ./config/alert-sink/alert_sink.py:/app/alert_sink.py:ro
@@ -130,6 +136,7 @@ services:
   grafana:
     image: grafana/grafana:13.2.6
     container_name: attendflow-grafana
+    restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in observability/.env}
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -160,13 +167,14 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 512M
+          memory: 1G
 
   # Container metrics for every Compose service (CPU, memory, network), labelled by service name.
   # Runs read-only against the Docker Desktop Linux VM; it cannot see the macOS host itself.
   cadvisor:
     image: ghcr.io/google/cadvisor:v0.61.0
     container_name: attendflow-cadvisor
+    restart: unless-stopped
     command:
       - --docker_only=true
       - --housekeeping_interval=15s
@@ -196,6 +204,7 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.12.1-busybox
     container_name: attendflow-node-exporter
+    restart: unless-stopped
     command:
       - --path.rootfs=/rootfs
     pid: host
@@ -221,6 +230,7 @@ services:
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     container_name: attendflow-postgres-exporter
+    restart: unless-stopped
     environment:
       DATA_SOURCE_URI: "postgres:5432/postgres?sslmode=disable"
       DATA_SOURCE_USER: attendflow_monitor
