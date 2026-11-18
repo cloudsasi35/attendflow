@@ -418,6 +418,35 @@ Expected: the API and the frontend keep working. `ScrapeTargetDown` (critical) f
 
 Grafana (http://127.0.0.1:3000) has the same data in Explore: Prometheus for metrics, Loki for logs, and Tempo for traces.
 
+### Observability Configuration Files
+
+All paths are under `observability/`. Secrets live in `observability/.env` (gitignored); `.env.example` lists the variables.
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Defines every observability service: pinned images, healthchecks, resource limits, `restart: unless-stopped`, named volumes, and the shared `attendflow-net` and `observability-net` networks. Grafana is the only service with a host port (`127.0.0.1:3000`). |
+| `.env.example` | Template for the required secrets (`GRAFANA_ADMIN_PASSWORD`, `POSTGRES_EXPORTER_PASSWORD`). Generate values with `openssl rand -hex 24`. |
+| `config/otel-collector/config.yaml` | OTLP receiver on 4317/4318. Routes traces to Tempo, metrics to Prometheus (remote write) and logs to Loki. Exposes health on `:13133` and self-metrics on `:8888`. |
+| `config/prometheus/prometheus.yml` | Scrape jobs for Prometheus, Alertmanager, Loki, Tempo, cAdvisor, Node Exporter, postgres-exporter and the collector. Loads the rule file. |
+| `config/prometheus/rules/alerts.yml` | 10 alert rules in 5 groups. Each has a `for:` duration and a `severity` label (`critical` or `warning`). `Watchdog` is an always-firing heartbeat. |
+| `config/alertmanager/alertmanager.yml` | Routes `critical` and `warning` alerts to the private `alert-sink` webhook, and `Watchdog` to a null receiver. |
+| `config/alert-sink/alert_sink.py` | Small webhook receiver for Alertmanager. It prints each alert as one JSON line, read with `docker logs`. |
+| `config/loki/loki.yaml` | Loki single-binary config with local filesystem storage for log chunks and the index. |
+| `config/tempo/tempo.yaml` | Tempo single-binary config: OTLP ingest and local block storage. |
+| `config/postgres-exporter/create-monitor-role.sql` | Creates the read-only `attendflow_monitor` role with `pg_monitor`. Idempotent, so it can be rerun after a password change. |
+| `config/grafana/provisioning/datasources/datasources.yml` | Declares the Prometheus, Loki and Tempo datasources with fixed UIDs. They are read-only in the UI. |
+| `config/grafana/provisioning/dashboards/dashboards.yml` | Loads dashboard JSON from `/var/lib/grafana/dashboards` into the "AttendFlow" folder. UI edits are disabled, so dashboards stay in Git. |
+| `config/grafana/dashboards/*.json` | Three dashboards: Containers (cAdvisor), Host (Node Exporter) and PostgreSQL (postgres-exporter). |
+
+Validate changes before restarting:
+
+```bash
+docker compose -f observability/docker-compose.yml config -q                       # Compose syntax
+docker compose -f observability/docker-compose.yml exec prometheus promtool check config /etc/prometheus/prometheus.yml
+```
+
+Expected result: both commands exit with no errors. Prometheus and Alertmanager read their configs only at startup, so restart them after editing.
+
 ### Common Issues
 
 **Frontend showing blank page:**
