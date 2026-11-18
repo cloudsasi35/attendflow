@@ -1,10 +1,15 @@
 """Health check API routes."""
 
+import logging
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from attendflow.database import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -22,5 +27,9 @@ async def health_ready(db: Session = Depends(get_db)):
         # Try a simple database query
         db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
-    except Exception as e:
-        return {"status": "error", "database": str(e)}, 503
+    except Exception:
+        logger.exception("Readiness check failed: database unavailable")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "database": "unavailable"},
+        )

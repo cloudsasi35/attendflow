@@ -157,7 +157,7 @@ curl -H "Authorization: Bearer {token}" http://localhost:8000/api/v1/auth/me
 
 **Health Checks:**
 - `GET /health/live` - Liveness probe (always 200)
-- `GET /health/ready` - Readiness probe (checks database)
+- `GET /health/ready` - Readiness probe (checks database; returns 503 when the database is unreachable)
 
 ## Database Management
 
