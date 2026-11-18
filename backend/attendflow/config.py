@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Seed
     seed_demo_data: bool = True
 
+    # Logging level for the root logger (console and OpenTelemetry logs)
+    log_level: str = "INFO"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
