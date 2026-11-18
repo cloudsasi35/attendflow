@@ -78,8 +78,7 @@ services:
       - "5173:5173"
     environment:
       VITE_API_URL: http://localhost:8000
-    depends_on:
-      - backend
+      VITE_TELEMETRY_ENABLED: ${VITE_TELEMETRY_ENABLED:-true}
     networks:
       - attendflow-net
     deploy:

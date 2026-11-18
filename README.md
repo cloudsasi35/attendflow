@@ -307,6 +307,32 @@ docker exec attendflow-prometheus wget -qO- --post-data='query=sum by (http_rout
 
 Expected: Prometheus returns routes such as `/api/v1/auth/me`; no `/health/live` or `/health/ready` appears. Tempo has root spans named like `GET /api/v1/auth/me` with child `SELECT` spans.
 
+### Frontend Telemetry
+
+The browser sends traces to the collector through the Vite dev server. The page-load timing and each API request (XHR) become spans under the service `attendflow-frontend`. Uncaught errors and Vue component errors are recorded as spans with an exception event. Setup is in [telemetry.ts](frontend/src/telemetry.ts).
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `VITE_TELEMETRY_ENABLED` | on | Set to `false` to turn browser telemetry off. Pass it through Compose: `VITE_TELEMETRY_ENABLED=false docker compose up -d frontend` |
+| `OTEL_PROXY_TARGET` | `http://otel-collector:4318` | Where the Vite `/otel` proxy forwards OTLP/HTTP requests |
+| `VITE_API_URL` | `http://localhost:8000` | API origin. Trace headers (`traceparent`) are sent only to this origin |
+
+- The browser posts to `/otel/v1/traces` on the frontend origin, so no collector CORS setting is needed.
+- The exporter's own requests are excluded from tracing, so no feedback loop occurs.
+- Browser metrics and logs are not collected. Only traces are.
+- This is dev-only. The frontend runs under the Vite dev server, which has no production build serving the `/otel` path.
+- Error messages are sent as span attributes and may contain user data. Review them before using this outside local development.
+- The OpenTelemetry browser packages are pinned to the 2.7 / 0.215 release line. Newer exporter and instrumentation releases require `@opentelemetry/api` 1.10 or later, which conflicts with `@opentelemetry/sdk-trace-base` 2.x.
+
+Verify (with the observability stack running and the frontend restarted):
+
+```bash
+# Proxy forwards OTLP: expect HTTP 200 (send an empty OTLP/JSON body, no spans)
+curl -s -o /dev/null -w "%{http_code}\n" -X POST -H 'Content-Type: application/json' -d '{}' http://localhost:5173/otel/v1/traces
+```
+
+Then open the app, sign in, and search Tempo in Grafana for service `attendflow-frontend`. Expected: `documentLoad` traces and `GET`/`POST` traces. The XHR traces also contain `attendflow-backend` spans with the same trace ID.
+
 ### Alerting
 
 Rules are in [alerts.yml](observability/config/prometheus/rules/alerts.yml). Prometheus evaluates them and sends firing alerts to Alertmanager ([alertmanager.yml](observability/config/alertmanager/alertmanager.yml)), which routes them by severity:
