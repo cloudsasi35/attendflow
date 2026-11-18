@@ -371,6 +371,53 @@ Expected: `ScrapeTargetDown` goes `pending` then `firing` after 2 minutes. The s
 
 Rules use `for:` so one-off spikes do not page. Alertmanager reads its config only at startup. After changing it, run `docker compose -f observability/docker-compose.yml up -d --force-recreate alertmanager`.
 
+### Failure Drills
+
+These drills stop one dependency at a time and check what the app and the observability stack do. Run them on a local stack only. Each drill was run and the results below were observed.
+
+**Drill 1: database outage** (application impact expected)
+
+```bash
+docker compose stop postgres
+sleep 150
+curl -s -o /dev/null -w "ready=%{http_code}\n" http://localhost:8000/health/ready   # expect 503
+curl -s -o /dev/null -w "live=%{http_code}\n"  http://localhost:8000/health/live    # expect 200
+docker exec attendflow-prometheus wget -qO- http://localhost:9090/api/v1/alerts     # PostgresDown firing
+docker compose start postgres
+# wait about 3 minutes: readiness returns 200 and PostgresDown resolves
+```
+
+Expected: readiness fails and liveness stays up, so the container is not restarted by the healthcheck. `PostgresDown` (critical) fires after 2 minutes and reaches the sink on `/critical`.
+
+**Drill 2: collector outage** (application impact expected to be none)
+
+```bash
+docker compose -f observability/docker-compose.yml stop otel-collector
+sleep 240
+curl -s -o /dev/null -w "api=%{http_code}\n"      http://localhost:8000/health/ready   # expect 200
+curl -s -o /dev/null -w "frontend=%{http_code}\n" http://localhost:5173/              # expect 200
+docker exec attendflow-prometheus wget -qO- http://localhost:9090/api/v1/alerts       # ScrapeTargetDown (otel-collector) firing
+docker logs --since 4m attendflow-backend 2>&1 | grep -c "Failed to export"            # expect a non-zero count
+docker compose -f observability/docker-compose.yml start otel-collector
+# wait about 3 minutes: ScrapeTargetDown resolves
+```
+
+Expected: the API and the frontend keep working. `ScrapeTargetDown` (critical) fires after 2 minutes, because Prometheus scrapes the collector's own metrics on `:8888`. The backend logs OTLP export failures, and the browser's `/otel` proxy returns 500 while the collector is down. The page itself is not affected. `BackendNoTraffic` (warning) fires after 15 minutes of no backend telemetry. It was observed at 15 minutes.
+
+**Drill 3: exporter outage** — see the Failure simulation under [Alerting](#alerting).
+
+**Where to look when something fails**
+
+| Symptom | First check |
+|---------|-------------|
+| `/health/ready` returns 503 | `docker logs attendflow-backend`, then `docker compose ps postgres` |
+| An alert is firing | Prometheus `api/v1/alerts`, then Alertmanager `api/v2/alerts` |
+| A target is down | Prometheus `api/v1/targets`, then the container's own `docker logs` |
+| Backend traces or logs are missing | `docker logs attendflow-otel-collector`, then the `BackendNoTraffic` alert |
+| Browser traces are missing | Vite's `/otel` proxy returns 500 when the collector is down. Check the collector first |
+
+Grafana (http://127.0.0.1:3000) has the same data in Explore: Prometheus for metrics, Loki for logs, and Tempo for traces.
+
 ### Common Issues
 
 **Frontend showing blank page:**

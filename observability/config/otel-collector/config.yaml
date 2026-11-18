@@ -1,6 +1,7 @@
 # OpenTelemetry Collector pipeline.
 # Receives OTLP from the app and forwards each signal to its backend.
 # Health: the health_check extension listens on :13133 inside the container.
+# Self-metrics: Prometheus scrapes the collector's own telemetry on :8888.
 receivers:
   otlp:
     protocols:
@@ -34,6 +35,14 @@ extensions:
 
 service:
   extensions: [health_check]
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
   pipelines:
     traces:
       receivers: [otlp]
