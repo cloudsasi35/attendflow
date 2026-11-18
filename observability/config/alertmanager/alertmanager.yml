@@ -1,0 +1,11 @@
+# Alertmanager routing. Stage 1 sends everything to a null receiver so the
+# pipeline runs without notifications. The real receiver is chosen in Stage 5.
+route:
+  receiver: "null"
+  group_by: ["alertname", "severity"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: "null"

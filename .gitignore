@@ -82,6 +82,8 @@ Thumbs.db
 
 # Docker
 .dockerignore
+!backend/.dockerignore
+!frontend/.dockerignore
 
 # Database
 *.db

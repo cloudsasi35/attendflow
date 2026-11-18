@@ -1,0 +1,11 @@
+# Stage 1 alert: Watchdog always fires. Its only purpose is to prove the
+# Prometheus -> Alertmanager path works. Stage 5 adds the real alert rules.
+groups:
+  - name: platform
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: Always firing. Confirms the alerting pipeline is working.
