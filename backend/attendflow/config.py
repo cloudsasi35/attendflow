@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Database
-    database_url: str = "postgresql://attendflow:attendflow@localhost:5432/attendflow"
+    database_url: str = "postgresql+psycopg://attendflow:attendflow@localhost:5432/attendflow"
 
     # JWT
     jwt_secret_key: str = "dev-secret-key-change-in-production"

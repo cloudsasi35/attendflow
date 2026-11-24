@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
       POSTGRES_INITDB_ARGS: "-U postgres"
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
     ports:
       - "5432:5432"
     volumes:
@@ -24,7 +25,7 @@ services:
       dockerfile: Dockerfile
     container_name: attendflow-backend
     environment:
-      DATABASE_URL: postgresql://attendflow:attendflow@postgres:5432/attendflow
+      DATABASE_URL: postgresql+psycopg://attendflow:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}@postgres:5432/attendflow
       JWT_SECRET_KEY: dev-secret-key-change-in-production
       APP_ENV: development
       DEBUG: "true"
@@ -37,7 +38,7 @@ services:
     volumes:
       - ./backend:/app
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health/live', timeout=4).status == 200 else 1)"]
       interval: 10s
       timeout: 5s
       retries: 5
