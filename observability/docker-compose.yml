@@ -111,7 +111,6 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"
@@ -135,84 +134,6 @@ services:
         limits:
           cpus: "0.5"
           memory: 512M
-
-  # Container metrics for every Compose service (CPU, memory, network), labelled by service name.
-  # Runs read-only against the Docker Desktop Linux VM; it cannot see the macOS host itself.
-  cadvisor:
-    image: ghcr.io/google/cadvisor:v0.61.0
-    container_name: attendflow-cadvisor
-    command:
-      - --docker_only=true
-      - --housekeeping_interval=15s
-      - --containerd=/var/run/docker/containerd/containerd.sock
-      - --containerd-namespace=moby
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker:/var/lib/docker:ro
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    networks:
-      - observability-net
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 256M
-
-  # Host metrics (CPU, memory, disk, network). Reads the Docker Desktop Linux VM on macOS.
-  # pid: host and the read-only root mount let it read host-level /proc and /sys data.
-  node-exporter:
-    image: prom/node-exporter:v1.12.1-busybox
-    container_name: attendflow-node-exporter
-    command:
-      - --path.rootfs=/rootfs
-    pid: host
-    volumes:
-      - /:/rootfs:ro
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9100/metrics"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - observability-net
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 128M
-
-  # PostgreSQL metrics. Connects as the read-only attendflow_monitor role (pg_monitor only).
-  # The user and password are supplied separately so the password never appears in the DSN.
-  # DATA_SOURCE_NAME ignores DATA_SOURCE_PASS, so the host/port/options come from DATA_SOURCE_URI.
-  postgres-exporter:
-    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
-    container_name: attendflow-postgres-exporter
-    environment:
-      DATA_SOURCE_URI: "postgres:5432/postgres?sslmode=disable"
-      DATA_SOURCE_USER: attendflow_monitor
-      DATA_SOURCE_PASS: ${POSTGRES_EXPORTER_PASSWORD:?Set POSTGRES_EXPORTER_PASSWORD in observability/.env}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9187/metrics"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - attendflow-net
-      - observability-net
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 128M
 
 networks:
   attendflow-net:
