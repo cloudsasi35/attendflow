@@ -16,12 +16,6 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
-      // Browser telemetry: same-origin OTLP/HTTP requests forwarded to the collector.
-      '/otel': {
-        target: process.env.OTEL_PROXY_TARGET || 'http://otel-collector:4318',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/otel/, ''),
-      },
     },
   },
 })
