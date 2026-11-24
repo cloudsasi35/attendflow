@@ -93,9 +93,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    depends_on:
-      alert-sink:
-        condition: service_healthy
     networks:
       - observability-net
     deploy:
@@ -103,29 +100,6 @@ services:
         limits:
           cpus: "0.25"
           memory: 128M
-
-  # Private webhook receiver for Alertmanager. It is not published to the host.
-  # Alerts are printed to its logs and kept in memory for GET /alerts (see alert_sink.py).
-  # Replace it with Slack or email receivers when credentials are available.
-  alert-sink:
-    image: python:3.12-alpine3.22
-    container_name: attendflow-alert-sink
-    command: ["python", "-u", "/app/alert_sink.py"]
-    volumes:
-      - ./config/alert-sink/alert_sink.py:/app/alert_sink.py:ro
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz', timeout=3)"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - observability-net
-    deploy:
-      resources:
-        limits:
-          cpus: "0.10"
-          memory: 96M
 
   grafana:
     image: grafana/grafana:13.2.6

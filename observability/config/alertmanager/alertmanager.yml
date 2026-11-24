@@ -1,32 +1,11 @@
-# Alertmanager routing.
-# Watchdog is dropped by the null receiver. Critical alerts go to the critical
-# webhook with a short wait and a 1h repeat. Warning alerts, and any alert
-# without a severity label, go to the warning webhook with a 4h repeat.
-# Both webhooks point at the private alert-sink container (no credentials).
-# To use Slack or email instead, change the receiver definitions below.
+# Alertmanager routing. Stage 1 sends everything to a null receiver so the
+# pipeline runs without notifications. The real receiver is chosen in Stage 5.
 route:
-  receiver: "warning"
+  receiver: "null"
   group_by: ["alertname", "severity"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-  routes:
-    - matchers:
-        - alertname="Watchdog"
-      receiver: "null"
-    - matchers:
-        - severity="critical"
-      receiver: "critical"
-      group_wait: 10s
-      repeat_interval: 1h
 
 receivers:
   - name: "null"
-  - name: "critical"
-    webhook_configs:
-      - url: "http://alert-sink:8080/critical"
-        send_resolved: true
-  - name: "warning"
-    webhook_configs:
-      - url: "http://alert-sink:8080/warning"
-        send_resolved: true
