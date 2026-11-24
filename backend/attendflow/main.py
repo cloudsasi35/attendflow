@@ -5,11 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 from attendflow.config import settings
-from attendflow.telemetry import configure_telemetry, instrument_fastapi
 
 logger = logging.getLogger(__name__)
-
-configure_telemetry()
 
 
 def create_app() -> FastAPI:
@@ -22,7 +19,6 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
-    instrument_fastapi(app)
 
     # Configure CORS
     app.add_middleware(

@@ -279,34 +279,6 @@ Backend runs with `DEBUG=true`. SQL queries are logged to console.
 
 Frontend Vite dev server has HMR enabled - changes to `.vue` or `.ts` files trigger hot reload.
 
-### Backend Telemetry
-
-The backend sends traces, metrics and logs over OTLP gRPC to the OpenTelemetry Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`). The collector forwards them to Tempo, Prometheus and Loki. Setup is in [telemetry.py](backend/attendflow/telemetry.py).
-
-| Variable | Default (compose) | Purpose |
-|----------|-------------------|---------|
-| `OTEL_SERVICE_NAME` | `attendflow-backend` | Service name on traces, metrics and logs |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4317` | Collector gRPC endpoint |
-| `OTEL_SEMCONV_STABILITY_OPT_IN` | `http` | Emits stable HTTP metric names (`http_server_request_duration_seconds`, `http_route`) |
-| `OTEL_SDK_DISABLED` | unset | Set to `true` to turn telemetry off |
-| `LOG_LEVEL` | `INFO` | Root log level |
-
-- `/health/live` and `/health/ready` are not traced or counted, so probe traffic does not fill dashboards.
-- Each log line carries `trace_id` and `span_id` for correlation in Loki and Tempo.
-- Telemetry is configured before the SQLAlchemy engine is created. Keep that order in `main.py`.
-- SQLAlchemy is pinned below 2.1 because the instrumentation supports only `<2.1.0`.
-
-Verify (with the observability stack running):
-
-```bash
-# API traces exist and no health-probe traces appear
-curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/auth/me >/dev/null
-# Prometheus: one series per API route, no /health/* routes
-docker exec attendflow-prometheus wget -qO- --post-data='query=sum by (http_route) (http_server_request_duration_seconds_count{job="attendflow-backend"})' http://localhost:9090/api/v1/query
-```
-
-Expected: Prometheus returns routes such as `/api/v1/auth/me`; no `/health/live` or `/health/ready` appears. Tempo has root spans named like `GET /api/v1/auth/me` with child `SELECT` spans.
-
 ### Common Issues
 
 **Frontend showing blank page:**

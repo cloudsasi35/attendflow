@@ -8,9 +8,8 @@ import os
 from datetime import datetime, timezone, date
 import uuid
 
-# Set testing environment and keep OpenTelemetry exporters off during tests
+# Set testing environment
 os.environ["APP_ENV"] = "testing"
-os.environ["OTEL_SDK_DISABLED"] = "true"
 
 from attendflow.config import settings
 from attendflow.database import get_db
