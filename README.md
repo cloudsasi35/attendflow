@@ -123,9 +123,13 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
   -d '{"email":"admin@attendflow.local","password":"admin123"}'
 ```
 
-Response includes `access_token` to use in Authorization header:
+Response includes `access_token` to use in Authorization header. This captures the token from the login response and calls `/auth/me`:
 ```bash
-curl -H "Authorization: Bearer {token}" http://localhost:8000/api/v1/auth/me
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@attendflow.local","password":"admin123"}' \
+  | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])')
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/auth/me
 ```
 
 ### Available Endpoints
